@@ -249,6 +249,7 @@ canvas{width:100%;border-radius:5px;background:var(--bg);touch-action:pan-y;}
     <div class="atab" data-p="tmp">溫度</div>
     <div class="atab" data-p="deg">衰退</div>
     <div class="atab" data-p="crn">彎道</div>
+    <div class="atab" data-p="damp">阻尼</div>
     <div class="atab" data-p="sug">建議</div>
     <div class="atab" data-p="vid">影片</div>
     <div class="atab" data-p="note">備註</div>
@@ -264,6 +265,10 @@ canvas{width:100%;border-radius:5px;background:var(--bg);touch-action:pan-y;}
   <div class="acnt" id="acnt"></div>
 </div>
 
+<div class="lang-toggle" style="position:fixed;bottom:20px;right:70px;z-index:99;display:flex;gap:2px;background:var(--bg2);border:1px solid var(--border);border-radius:22px;padding:4px;box-shadow:0 2px 8px rgba(0,0,0,.3);">
+  <button id="langZh" onclick="setLang('zh')" style="background:var(--orange);color:#fff;border:none;border-radius:18px;padding:6px 10px;font-size:12px;cursor:pointer;font-weight:600;">中</button>
+  <button id="langEn" onclick="setLang('en')" style="background:none;color:var(--text2);border:none;border-radius:18px;padding:6px 10px;font-size:12px;cursor:pointer;font-weight:600;">EN</button>
+</div>
 <div class="theme-toggle" id="themeBtn">🌙</div>
 <div class="toast" id="toast"></div>
 <script>
@@ -324,6 +329,105 @@ let gChartMode='glat'; // 'glat'=橫向G, 'glon'=縱向G(加速/減速), 'both'=
 let ovCanvases=[]; // array of {id, el} for mouse tracking
 
 try{notes=JSON.parse(localStorage.getItem('trackNotes')||'{}');}catch(e){}
+
+// ===== i18n LANGUAGE SYSTEM =====
+let curLang=localStorage.getItem('lang')||'zh';
+const LANG={
+zh:{
+  // Nav tabs
+  ov:'總覽',map:'地圖',gf:'G值',sec:'分段',cmp:'比較',tmp:'溫度',deg:'衰退',crn:'彎道',sug:'建議',vid:'影片',note:'筆記',damp:'阻尼分析',
+  // Stats
+  lapTime:'圈時',topSpeed:'最高速',avgSpeed:'平均速',trapSpeed:'尾速',accelG:'加速G',brakeG:'煞車G',latG:'橫G',dist:'距離',
+  consistency:'圈速一致性',stdev:'標準差',avgLap:'平均圈速',maxLean:'最大傾角',
+  // Cursor info
+  time:'時間',speedKmh:'速度 km/h',latGLabel:'橫向G',lonGLabel:'縱向G',forkPct:'前叉 %',shockPct:'後避震 %',distM:'距離 m',leanDeg:'傾角°',
+  // Charts
+  speed:'速度',susp:'懸吊',suspPct:'懸吊 (%)',fork:'前叉',shock:'後避震',gValue:'G 值',latGBtn:'橫向G',lonGBtn:'縱向G',allG:'全部',
+  latGCorner:'橫向(過彎)',lonGAccDec:'縱向(加減速)',
+  lean:'傾角（推估）',deltaTime:'Delta 時間差（vs 最速圈）',
+  // Zoom
+  wheelZoom:'滾輪縮放 | 拖拉平移',dblReset:'雙擊還原',fullLap:'全圈',segMode:'分段',prevSeg:'◀ 上一段',nextSeg:'下一段 ▶',
+  seg:'段',
+  // Track map
+  trackLine:'賽道軌跡',speedOpt:'速度',lonGOpt:'縱向G',latGOpt:'橫向G',brakeThrottle:'煞車/油門',
+  // Toggle labels
+  mapToggle:'地圖',speedToggle:'速度',latGToggle:'橫向G',leanToggle:'傾角',suspToggle:'懸吊',deltaToggle:'Delta',
+  // Table
+  lapOverview:'單圈總覽',lap:'圈',s1:'S1',s2:'S2',s3:'S3',topSpd:'極速',avgSpd:'均速',
+  // Tooltip
+  ttSpeed:'車速:',ttFork:'前叉:',ttShock:'後避震:',ttLatG:'橫向G:',ttLonG:'縱向G:',ttLean:'傾角:',
+  // Axis
+  xTime:'時間',xDist:'距離',
+  // Misc
+  bestLapSelected:'已選最速圈',unknownTrack:'未知場地（自動偵測）',
+  connectGD:'連接 Google Drive...',downloading:'下載檔案...',gdError:'請確認連結設為公開，或直接選擇檔案匯入',
+  // Home
+  homeTitle:'RES Instrument',homeDesc:'Racing Electronic System — Visualize your sensation',
+  importCSV:'匯入 CSV 資料',pasteGD:'或貼上 Google Drive 連結',loadBtn:'載入',
+  // Compare
+  lapCompare:'圈時比較',
+  // Degradation
+  tireDeg:'輪胎衰退分析（圈時趨勢）',
+  // Corner
+  cornerMinSpeed:'彎道最低速分析',cornerCompare:'彎道逐一比較表',cornerLean:'彎道傾角推估',cornerCrossLap:'彎道最低速（跨圈比較）',cornerNeedData:'需要賽道彎道資料（自動偵測賽道後顯示）',
+  // Suggestions
+  aiSuggestions:'AI 最佳化建議',noSuggestions:'表現優秀！暫無明顯改善建議。',
+  // Video
+  videoSync:'GoPro 影片同步',videoDesc:'載入影片後，設定時間偏移量來對齊遙測數據。拖動進度條會同步更新數據。',videoDrop:'📹 點擊或拖入影片檔案',
+  // Report
+  reportTitle:'🏁 RES Instrument — Telemetry Report',reportBy:'由 RES Instrument 產生',
+  // Export
+  exportCSV:'匯出 CSV',exportReport:'匯出報告',
+  // Damping Analysis
+  dampTitle:'阻尼分析',dampHealth:'阻尼健康度',dampScore:'分數',forkScore:'前叉評分',shockScore:'後避震評分',issuesFound:'發現問題',noIssues:'未發現異常',oscillation:'懸吊震盪',gRatioAnomaly:'G值行程比異常',brakingOvershoot:'煞車回彈過衝',accelOscillation:'加速避震震盪',severity:'嚴重程度',severe:'嚴重',moderate:'中等',mild:'輕微',component:'元件',frontFork:'前叉',rearShock:'後避震',suggestion:'建議',noData:'請先選擇圈數',
+},
+en:{
+  ov:'Overview',map:'Map',gf:'G-Force',sec:'Sectors',cmp:'Compare',tmp:'Temp',deg:'Degrad.',crn:'Corners',sug:'Tips',vid:'Video',note:'Notes',damp:'Damping',
+  lapTime:'Lap Time',topSpeed:'Top Speed',avgSpeed:'Avg Speed',trapSpeed:'Trap Speed',accelG:'Accel G',brakeG:'Brake G',latG:'Lat G',dist:'Dist',
+  consistency:'Lap Consistency',stdev:'Std Dev',avgLap:'Avg Lap',maxLean:'Max Lean',
+  time:'Time',speedKmh:'Speed km/h',latGLabel:'Lateral G',lonGLabel:'Longi. G',forkPct:'Fork %',shockPct:'Shock %',distM:'Dist m',leanDeg:'Lean°',
+  speed:'Speed',susp:'Suspension',suspPct:'Suspension (%)',fork:'Fork',shock:'Shock',gValue:'G-Force',latGBtn:'Lateral G',lonGBtn:'Longi. G',allG:'Both',
+  latGCorner:'Lateral (cornering)',lonGAccDec:'Longi. (accel/brake)',
+  lean:'Lean Angle (est.)',deltaTime:'Delta Time (vs Best Lap)',
+  wheelZoom:'Scroll to zoom | Drag to pan',dblReset:'Double-click to reset',fullLap:'Full Lap',segMode:'Segment',prevSeg:'◀ Prev',nextSeg:'Next ▶',
+  seg:'Seg',
+  trackLine:'Track Line',speedOpt:'Speed',lonGOpt:'Longi. G',latGOpt:'Lateral G',brakeThrottle:'Brake/Throttle',
+  mapToggle:'Map',speedToggle:'Speed',latGToggle:'Lat G',leanToggle:'Lean',suspToggle:'Susp',deltaToggle:'Delta',
+  lapOverview:'Lap Overview',lap:'Lap',s1:'S1',s2:'S2',s3:'S3',topSpd:'Top',avgSpd:'Avg',
+  ttSpeed:'Speed:',ttFork:'Fork:',ttShock:'Shock:',ttLatG:'Lat G:',ttLonG:'Lon G:',ttLean:'Lean:',
+  xTime:'Time',xDist:'Distance',
+  bestLapSelected:'Best lap selected',unknownTrack:'Unknown track (auto-detect)',
+  connectGD:'Connecting to Google Drive...',downloading:'Downloading...',gdError:'Make sure the link is set to public, or import the file directly.',
+  homeTitle:'RES Instrument',homeDesc:'Racing Electronic System — Visualize your sensation',
+  importCSV:'Import CSV data',pasteGD:'Or paste a Google Drive link',loadBtn:'Load',
+  lapCompare:'Lap Time Comparison',
+  tireDeg:'Tire Degradation (Lap Time Trend)',
+  cornerMinSpeed:'Corner Min Speed Analysis',cornerCompare:'Corner Comparison Table',cornerLean:'Corner Lean Estimation',cornerCrossLap:'Corner Min Speed (Cross-Lap)',cornerNeedData:'Corner data needed (auto-detected after track recognition)',
+  aiSuggestions:'AI Optimization Tips',noSuggestions:'Great performance! No obvious areas for improvement.',
+  videoSync:'GoPro Video Sync',videoDesc:'Load a video, set the time offset to align with telemetry. Scrubbing updates data in real-time.',videoDrop:'📹 Click or drag video file here',
+  reportTitle:'🏁 RES Instrument — Telemetry Report',reportBy:'Generated by RES Instrument',
+  exportCSV:'Export CSV',exportReport:'Export Report',
+  // Damping Analysis
+  dampTitle:'Damping Analysis',dampHealth:'Damping Health',dampScore:'Score',forkScore:'Fork Score',shockScore:'Shock Score',issuesFound:'Issues Found',noIssues:'No anomalies detected',oscillation:'Suspension Oscillation',gRatioAnomaly:'G-Ratio Anomaly',brakingOvershoot:'Braking Overshoot',accelOscillation:'Accel Oscillation',severity:'Severity',severe:'Severe',moderate:'Moderate',mild:'Mild',component:'Component',frontFork:'Front Fork',rearShock:'Rear Shock',suggestion:'Suggestion',noData:'Please select a lap first',
+}
+};
+function t(key){return LANG[curLang][key]||LANG.zh[key]||key;}
+function setLang(lang){curLang=lang;localStorage.setItem('lang',lang);render();updLangUI();}
+function updLangUI(){
+  var bZh=document.getElementById('langZh'),bEn=document.getElementById('langEn');
+  if(bZh){bZh.style.background=curLang==='zh'?'var(--orange)':'';bZh.style.color=curLang==='zh'?'#fff':'';bZh.style.borderColor=curLang==='zh'?'var(--orange)':'';}
+  if(bEn){bEn.style.background=curLang==='en'?'var(--orange)':'';bEn.style.color=curLang==='en'?'#fff':'';bEn.style.borderColor=curLang==='en'?'var(--orange)':'';}
+  // Update nav tabs
+  document.querySelectorAll('.atab[data-p]').forEach(el=>{
+    var k=el.dataset.p;if(LANG[curLang][k])el.textContent=LANG[curLang][k];
+  });
+  // Update X-axis selector
+  var tX=document.getElementById('tX');
+  if(tX){tX.options[0].textContent=t('xTime');tX.options[1].textContent=t('xDist');}
+  // Update export button
+  var expBtn=document.getElementById('expBtn');
+  if(expBtn)expBtn.textContent=t('exportCSV');
+}
 let sessions=[];
 try{sessions=JSON.parse(localStorage.getItem('tSessions')||'[]');}catch(e){}
 
@@ -334,6 +438,139 @@ function gC(g){const a=Math.abs(g);return a<0.3?'var(--green)':a<0.7?'var(--oran
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000);}
 function getX(p){return xM==='dist'?p[8]:p[0]/1000;}
 function gL(ri=0){return riders[ri]?.data.laps[curLap];}
+
+// ===== DAMPING ANALYSIS =====
+function analyzeDamping(lap){
+  if(!lap||!lap.pts||lap.pts.length<10)return[];
+  const pts=lap.pts,issues=[];
+
+  // A. Oscillation frequency analysis (懸吊震盪)
+  const detectOscillation=(suspIdx,component)=>{
+    const vel=[];
+    for(let i=1;i<pts.length;i++){
+      vel.push(pts[i][suspIdx]-pts[i-1][suspIdx]);
+    }
+    const issues=[];
+    let crossings=0,crossStart=-1,lastCross=-1;
+    for(let i=1;i<vel.length;i++){
+      if(vel[i]*vel[i-1]<0){
+        if(crossStart<0)crossStart=i;
+        lastCross=i;crossings++;
+      }
+    }
+    if(crossings>3&&lastCross-crossStart<500){
+      let amp=0;for(let k=crossStart;k<vel.length;k++){const av=Math.abs(vel[k]);if(av>amp)amp=av;}
+      const severity=crossings>6?'severe':crossings>4?'moderate':'mild';
+      const startTime=pts[crossStart][0];
+      const endTime=pts[lastCross][0];
+      const sug_zh=component==='fork'?(pts[crossStart][6]<-0.3?'前叉回彈阻尼不足，建議增加回彈阻尼':'前叉壓縮阻尼不足，建議增加壓縮阻尼'):'後避震回彈阻尼不足，建議增加回彈阻尼';
+      const sug_en=component==='fork'?(pts[crossStart][6]<-0.3?'Front fork rebound damping insufficient, increase rebound':'Front fork compression damping insufficient, increase compression'):'Rear shock rebound damping insufficient, increase rebound';
+      issues.push({type:'oscillation',zone:component,startTime,endTime,severity,suggestion_zh:sug_zh,suggestion_en:sug_en,data:{crossings,amp}});
+    }
+    return issues;
+  };
+  issues.push(...detectOscillation(2,'fork'));
+  issues.push(...detectOscillation(3,'shock'));
+
+  // B. G-to-suspension ratio anomaly (G值與行程比異常)
+  const detectGRatioAnomaly=()=>{
+    const win=20;
+    for(let i=win;i<pts.length-win;i++){
+      const avgG=Math.abs(pts[i][6])+Math.abs(pts[i][7]);
+      let forkMove=0,shockMove=0;
+      for(let j=i-win;j<=i+win;j++){
+        forkMove+=Math.abs(pts[j][2]-pts[i][2]);
+        shockMove+=Math.abs(pts[j][3]-pts[i][3]);
+      }
+      if(avgG<0.3&&(forkMove>15||shockMove>15)){
+        const comp=forkMove>shockMove?'fork':'shock';
+        const severity='moderate';
+        const startTime=pts[Math.max(0,i-win)][0];
+        const endTime=pts[Math.min(pts.length-1,i+win)][0];
+        const sug_zh=comp==='fork'?'前叉整體阻尼不足，懸吊對路面輸入反應過大':'後避震整體阻尼不足';
+        const sug_en=comp==='fork'?'Front fork overall damping insufficient, excessive response to road input':'Rear shock overall damping insufficient';
+        if(!issues.find(x=>x.type==='gRatioAnomaly'&&x.zone===comp&&Math.abs(x.startTime-startTime)<500)){
+          issues.push({type:'gRatioAnomaly',zone:comp,startTime,endTime,severity,suggestion_zh:sug_zh,suggestion_en:sug_en,data:{avgG,move:comp==='fork'?forkMove:shockMove}});
+          i+=100;
+        }
+      }
+    }
+  };
+  detectGRatioAnomaly();
+
+  // C. Braking overshoot (煞車回彈過衝)
+  const detectBrakingOvershoot=()=>{
+    for(let i=5;i<pts.length-5;i++){
+      if(pts[i][6]<-0.3){
+        let brakEnd=i;
+        while(brakEnd<pts.length-1&&pts[brakEnd][6]<-0.2)brakEnd++;
+        if(brakEnd<pts.length-10){
+          const preBrakePos=pts[i][2];
+          let maxPos=preBrakePos;
+          for(let j=brakEnd;j<Math.min(brakEnd+20,pts.length);j++){
+            if(pts[j][2]>maxPos)maxPos=pts[j][2];
+          }
+          const overshoot=maxPos-preBrakePos;
+          if(overshoot>8){
+            const severity=overshoot>15?'severe':'moderate';
+            const startTime=pts[brakEnd][0];
+            const endTime=pts[Math.min(brakEnd+20,pts.length-1)][0];
+            const sug_zh='前叉回彈阻尼不足，煞車釋放後過衝明顯';
+            const sug_en='Front fork rebound damping insufficient, significant overshoot after brake release';
+            if(!issues.find(x=>x.type==='brakingOvershoot'&&Math.abs(x.startTime-startTime)<500)){
+              issues.push({type:'brakingOvershoot',zone:'fork',startTime,endTime,severity,suggestion_zh:sug_zh,suggestion_en:sug_en,data:{overshoot}});
+              i=brakEnd+20;
+            }
+          }
+        }
+      }
+    }
+  };
+  detectBrakingOvershoot();
+
+  // D. Acceleration rear oscillation (加速後避震震盪)
+  const detectAccelOscillation=()=>{
+    for(let i=5;i<pts.length-10;i++){
+      if(pts[i][6]>0.3){
+        let accelEnd=i;
+        while(accelEnd<pts.length-1&&pts[accelEnd][6]>0.2)accelEnd++;
+        if(accelEnd<pts.length-15){
+          let vel=[],oscCount=0;
+          for(let j=accelEnd;j<Math.min(accelEnd+25,pts.length);j++){
+            vel.push(pts[j][3]-pts[j-1][3]);
+          }
+          for(let j=1;j<vel.length;j++){
+            if(vel[j]*vel[j-1]<0)oscCount++;
+          }
+          if(oscCount>3){
+            const severity=oscCount>5?'severe':'moderate';
+            const startTime=pts[accelEnd][0];
+            const endTime=pts[Math.min(accelEnd+25,pts.length-1)][0];
+            const sug_zh='後避震回彈阻尼不足，建議增加回彈阻尼';
+            const sug_en='Rear shock rebound damping insufficient, increase rebound damping';
+            if(!issues.find(x=>x.type==='accelOscillation'&&Math.abs(x.startTime-startTime)<500)){
+              issues.push({type:'accelOscillation',zone:'shock',startTime,endTime,severity,suggestion_zh:sug_zh,suggestion_en:sug_en,data:{oscCount}});
+              i=accelEnd+25;
+            }
+          }
+        }
+      }
+    }
+  };
+  detectAccelOscillation();
+
+  return issues.sort((a,b)=>a.startTime-b.startTime);
+}
+
+function calcDampingScore(issues){
+  if(issues.length===0)return 100;
+  let score=100;
+  issues.forEach(i=>{
+    const penality=i.severity==='severe'?15:i.severity==='moderate'?8:3;
+    score-=penality;
+  });
+  return Math.max(20,score);
+}
 
 // ===== Canvas utils =====
 function sC2(id,h){const c=document.getElementById(id);if(!c)return null;const d=window.devicePixelRatio||1;h=h||200;c.width=c.clientWidth*d;c.height=h*d;c.style.height=h+'px';const x=c.getContext('2d');x.scale(d,d);return{x,W:c.clientWidth,H:h};}
@@ -362,13 +599,10 @@ function dChart(cid,ds,o={}){
     mxX=fullMnX+zoomRange.end*xSpan;
   }
 
-  // Compute Y range from only visible (in x-range) data
+  // Compute Y range from raw data (only visible points in x-range)
   let mnY=Infinity,mxY=-Infinity;
-  ds.forEach(d=>d.d.forEach(p=>{
-    if(p[0]>=mnX&&p[0]<=mxX){if(p[1]<mnY)mnY=p[1];if(p[1]>mxY)mxY=p[1];}
-  }));
-  // Fallback if no visible points
-  if(mnY===Infinity){ds.forEach(d=>d.d.forEach(p=>{if(p[1]<mnY)mnY=p[1];if(p[1]>mxY)mxY=p[1];}));}
+  ds.forEach(d=>d.d.forEach(p=>{if(p[0]>=mnX&&p[0]<=mxX){if(p[1]<mnY)mnY=p[1];if(p[1]>mxY)mxY=p[1];}}));
+  if(mnY===Infinity)ds.forEach(d=>d.d.forEach(p=>{if(p[1]<mnY)mnY=p[1];if(p[1]>mxY)mxY=p[1];}));
   if(o.mnY!==undefined)mnY=o.mnY;if(o.mxY!==undefined)mxY=o.mxY;
   const yP=(mxY-mnY)*.05||1;mnY-=yP;mxY+=yP;
   if(mxX===mnX)mxX=mnX+1;if(mxY===mnY)mxY=mnY+1;
@@ -397,7 +631,7 @@ function dChart(cid,ds,o={}){
   ctx.beginPath();ctx.rect(P.l,P.t,gW,gH);ctx.clip();
 
   // Draw data lines
-  ds.forEach(d=>{ctx.strokeStyle=d.c||'var(--blue)';ctx.lineWidth=d.w||1.5;ctx.globalAlpha=d.a||1;ctx.beginPath();d.d.forEach((p,i)=>{const x2=P.l+((p[0]-mnX)/(mxX-mnX))*gW,y=P.t+gH-((p[1]-mnY)/(mxY-mnY))*gH;i===0?ctx.moveTo(x2,y):ctx.lineTo(x2,y);});ctx.stroke();if(d.f){ctx.lineTo(P.l+gW,P.t+gH);ctx.lineTo(P.l,P.t+gH);ctx.closePath();ctx.fillStyle=d.fc||'rgba(88,166,255,.08)';ctx.fill();}ctx.globalAlpha=1;});
+  ds.forEach(d=>{ctx.strokeStyle=d.c||'#58a6ff';ctx.lineWidth=d.w||1.5;ctx.globalAlpha=d.a||1;ctx.beginPath();d.d.forEach((p,i)=>{const x2=P.l+((p[0]-mnX)/(mxX-mnX))*gW,y=P.t+gH-((p[1]-mnY)/(mxY-mnY))*gH;i===0?ctx.moveTo(x2,y):ctx.lineTo(x2,y);});ctx.stroke();if(d.f){ctx.lineTo(P.l+gW,P.t+gH);ctx.lineTo(P.l,P.t+gH);ctx.closePath();ctx.fillStyle=d.fc||'rgba(88,166,255,.08)';ctx.fill();}ctx.globalAlpha=1;});
 
   ctx.restore();
 
@@ -411,6 +645,31 @@ function dChart(cid,ds,o={}){
 // ===== CSV Engine (same as before but in JS) =====
 function parseT(t){const p=t.split(':');return+p[0]*3600000+ +p[1]*60000+ +p[2]*1000+ +p[3];}
 function parseC(s){s=s.trim();if(s[0]==='N'||s[0]==='E')s=s.slice(1);const p=s.split('_');return+p[0]+ +p[1]/60;}
+
+// Savitzky-Golay smoothing filter (quadratic, window=2*hw+1)
+// Smooth [x,y] pair array — smooths Y values, keeps X intact
+function smoothDs(data){try{if(!data||data.length<7)return data;const yS=sgSmooth(data.map(p=>p[1]),3);return data.map((p,i)=>[p[0],yS[i]]);}catch(e){return data;}}
+
+function sgSmooth(data,hw=5){
+  const n=data.length;if(n<2*hw+1)return[...data];
+  const out=new Float64Array(n);
+  // Precompute SG coefficients for quadratic fit, window=2*hw+1
+  const m=hw;const norm=(2*m+1)*(2*m+3)*(2*m-1)/3;
+  // For quadratic SG: c_i = (3*m*(m+1) - 1 - 5*i*i) / norm_factor
+  // Simplified: use convolution weights
+  const w=[];let wSum=0;
+  for(let i=-m;i<=m;i++){const c=(3*m*(m+1)-1-5*i*i);w.push(c);wSum+=c;}
+  // Normalize
+  for(let i=0;i<w.length;i++)w[i]/=wSum;
+  // Apply convolution
+  for(let i=0;i<n;i++){
+    if(i<m||i>=n-m){out[i]=data[i];continue;}
+    let s=0;
+    for(let j=-m;j<=m;j++)s+=data[i+j]*w[j+m];
+    out[i]=s;
+  }
+  return Array.from(out);
+}
 
 function butterworth(data,cf=1.5,sr=5){
   const wc=Math.tan(Math.PI*cf/sr),wc2=wc*wc,k1=Math.sqrt(2)*wc;
@@ -512,7 +771,7 @@ function updBar(){
 
 // ===== PAGE RENDERS =====
 function render(){
-  const fn={ov:rOv,map:rMap,gf:rGF,sec:rSec,cmp:rCmp,tmp:rTmp,deg:rDeg,crn:rCrn,sug:rSug,vid:rVid,note:rNote}[pg];
+  const fn={ov:rOv,map:rMap,gf:rGF,sec:rSec,cmp:rCmp,tmp:rTmp,deg:rDeg,crn:rCrn,damp:rDamp,sug:rSug,vid:rVid,note:rNote}[pg];
   if(fn)fn();
 }
 
@@ -570,10 +829,10 @@ function applyZoom(){
       if(lap){
         var t0=(lap.pts[0][0]+zoomRange.start*(lap.pts[lap.pts.length-1][0]-lap.pts[0][0]))/1000;
         var t1=(lap.pts[0][0]+zoomRange.end*(lap.pts[lap.pts.length-1][0]-lap.pts[0][0]))/1000;
-        lbl.textContent=t0.toFixed(1)+'s ~ '+t1.toFixed(1)+'s ('+((zoomRange.end-zoomRange.start)*100).toFixed(0)+'%) 雙擊還原';
+        lbl.textContent=t0.toFixed(1)+'s ~ '+t1.toFixed(1)+'s ('+((zoomRange.end-zoomRange.start)*100).toFixed(0)+'%) '+t('dblReset');
       }
     } else {
-      lbl.textContent='滾輪縮放 | 拖拉平移';
+      lbl.textContent=t('wheelZoom');
     }
   }
   // Redraw charts with new range
@@ -697,7 +956,7 @@ function updateSegUI(){
     var maxSeg=Math.ceil(totalSec/SEG_SEC)-1;
     var t0s=(segIdx*SEG_SEC).toFixed(1);
     var t1s=Math.min((segIdx+1)*SEG_SEC, totalSec).toFixed(1);
-    lbl.textContent='第 '+(segIdx+1)+'/'+(maxSeg+1)+' 段 ('+t0s+'s ~ '+t1s+'s)';
+    lbl.textContent=t('seg')+' '+(segIdx+1)+'/'+(maxSeg+1)+' ('+t0s+'s ~ '+t1s+'s)';
   }
 }
 
@@ -706,14 +965,14 @@ function rOv(){
   const mgl=Math.max(...p.map(p=>p[6])),ngl=Math.min(...p.map(p=>p[6])),mgt=Math.max(...p.map(p=>Math.abs(p[7])));
   
   let h=`<div class="sg">
-    <div class="sc"><div class="v">${ms2l(l.dur)}</div><div class="l">圈時</div></div>
-    <div class="sc"><div class="v r">${l.maxS}</div><div class="l">最高速</div></div>
-    <div class="sc"><div class="v">${l.avgS}</div><div class="l">平均速</div></div>
-    <div class="sc"><div class="v g">${l.trap}</div><div class="l">尾速</div></div>
-    <div class="sc"><div class="v p">${mgl.toFixed(2)}</div><div class="l">加速G</div></div>
-    <div class="sc"><div class="v r">${ngl.toFixed(2)}</div><div class="l">煞車G</div></div>
-    <div class="sc"><div class="v">${mgt.toFixed(2)}</div><div class="l">橫G</div></div>
-    <div class="sc"><div class="v">${l.dist}m</div><div class="l">距離</div></div>
+    <div class="sc"><div class="v">${ms2l(l.dur)}</div><div class="l">${t('lapTime')}</div></div>
+    <div class="sc"><div class="v r">${l.maxS}</div><div class="l">${t('topSpeed')}</div></div>
+    <div class="sc"><div class="v">${l.avgS}</div><div class="l">${t('avgSpeed')}</div></div>
+    <div class="sc"><div class="v g">${l.trap}</div><div class="l">${t('trapSpeed')}</div></div>
+    <div class="sc"><div class="v p">${mgl.toFixed(2)}</div><div class="l">${t('accelG')}</div></div>
+    <div class="sc"><div class="v r">${ngl.toFixed(2)}</div><div class="l">${t('brakeG')}</div></div>
+    <div class="sc"><div class="v">${mgt.toFixed(2)}</div><div class="l">${t('latG')}</div></div>
+    <div class="sc"><div class="v">${l.dist}m</div><div class="l">${t('dist')}</div></div>
   </div>`;
   // Lap consistency stats
   const allValid=riders[0].data.laps.filter(x=>!x.pit);
@@ -722,23 +981,23 @@ function rOv(){
     const stdev=Math.sqrt(allValid.reduce((a,x)=>a+(x.dur-mean)**2,0)/allValid.length);
     const consistency=((1-stdev/mean)*100).toFixed(1);
     h+=`<div class="sg" style="margin-top:0;">
-      <div class="sc"><div class="v g">${consistency}%</div><div class="l">圈速一致性</div></div>
-      <div class="sc"><div class="v">${(stdev/1000).toFixed(2)}s</div><div class="l">標準差</div></div>
-      <div class="sc"><div class="v">${ms2l(mean)}</div><div class="l">平均圈速</div></div>
-      <div class="sc"><div class="v">${(Math.atan(Math.abs(mgt))*180/Math.PI).toFixed(1)}°</div><div class="l">最大傾角</div></div>
+      <div class="sc"><div class="v g">${consistency}%</div><div class="l">${t('consistency')}</div></div>
+      <div class="sc"><div class="v">${(stdev/1000).toFixed(2)}s</div><div class="l">${t('stdev')}</div></div>
+      <div class="sc"><div class="v">${ms2l(mean)}</div><div class="l">${t('avgLap')}</div></div>
+      <div class="sc"><div class="v">${(Math.atan(Math.abs(mgt))*180/Math.PI).toFixed(1)}°</div><div class="l">${t('maxLean')}</div></div>
     </div>`;
   }
 
   // Cursor info bar
   h+=`<div class="cursor-info" id="cursorInfo">
-    <div class="ci"><div class="cv" id="ciTime">--</div><div class="cl">時間</div></div>
-    <div class="ci"><div class="cv" id="ciSpd" style="color:var(--red)">--</div><div class="cl">速度 km/h</div></div>
-    <div class="ci"><div class="cv" id="ciGLat" style="color:var(--blue)">--</div><div class="cl">橫向G</div></div>
-    <div class="ci"><div class="cv" id="ciGLon" style="color:var(--green)">--</div><div class="cl">縱向G</div></div>
-    <div class="ci"><div class="cv" id="ciFSus" style="color:#58a6ff">--</div><div class="cl">前叉 %</div></div>
-    <div class="ci"><div class="cv" id="ciRSus" style="color:#f0883e">--</div><div class="cl">後避震 %</div></div>
-    <div class="ci"><div class="cv" id="ciDist">--</div><div class="cl">距離 m</div></div>
-    <div class="ci"><div class="cv" id="ciLean" style="color:var(--orange)">--</div><div class="cl">傾角°</div></div>
+    <div class="ci"><div class="cv" id="ciTime">--</div><div class="cl">${t('time')}</div></div>
+    <div class="ci"><div class="cv" id="ciSpd" style="color:var(--red)">--</div><div class="cl">${t('speedKmh')}</div></div>
+    <div class="ci"><div class="cv" id="ciGLat" style="color:var(--blue)">--</div><div class="cl">${t('latGLabel')}</div></div>
+    <div class="ci"><div class="cv" id="ciGLon" style="color:var(--green)">--</div><div class="cl">${t('lonGLabel')}</div></div>
+    <div class="ci"><div class="cv" id="ciFSus" style="color:#58a6ff">--</div><div class="cl">${t('forkPct')}</div></div>
+    <div class="ci"><div class="cv" id="ciRSus" style="color:#f0883e">--</div><div class="cl">${t('shockPct')}</div></div>
+    <div class="ci"><div class="cv" id="ciDist">--</div><div class="cl">${t('distM')}</div></div>
+    <div class="ci"><div class="cv" id="ciLean" style="color:var(--orange)">--</div><div class="cl">${t('leanDeg')}</div></div>
   </div>`;
 
   // Scrubber (full lap overview + zoom window)
@@ -750,26 +1009,26 @@ function rOv(){
   // Zoom + segment mode bar
   h+=`<div class="zoom-bar">
     <span class="zb-label">🔍</span>
-    <span class="zb-range" id="zoomLabel">滾輪縮放 | 拖拉平移</span>
+    <span class="zb-range" id="zoomLabel">${t('wheelZoom')}</span>
     <div style="margin-left:auto;display:flex;gap:4px;align-items:center;">
-      <button class="zb-btn" id="segModeAll" onclick="segModeOn=false;zoomRange=null;applyZoom();updateSegUI();" style="font-size:10px;${!segModeOn?'background:var(--orange);color:#fff;border-color:var(--orange)':''}">全圈</button>
-      <button class="zb-btn" id="segModeSeg" onclick="segModeOn=false;zoomRange=null;segModeOn=true;segIdx=0;applySegZoom();" style="font-size:10px;${segModeOn?'background:var(--orange);color:#fff;border-color:var(--orange)':''}">${SEG_SEC}s 分段</button>
+      <button class="zb-btn" id="segModeAll" onclick="segModeOn=false;zoomRange=null;applyZoom();updateSegUI();" style="font-size:10px;${!segModeOn?'background:var(--orange);color:#fff;border-color:var(--orange)':''}">${t('fullLap')}</button>
+      <button class="zb-btn" id="segModeSeg" onclick="segModeOn=false;zoomRange=null;segModeOn=true;segIdx=0;applySegZoom();" style="font-size:10px;${segModeOn?'background:var(--orange);color:#fff;border-color:var(--orange)':''}">${SEG_SEC}s ${t('segMode')}</button>
     </div>
   </div>
   <div id="segNavBar" style="display:${segModeOn?'flex':'none'};gap:8px;align-items:center;justify-content:center;margin:4px 0;padding:6px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;">
-    <button class="zb-btn" onclick="segNav(-1)" style="font-size:11px">◀ 上一段</button>
+    <button class="zb-btn" onclick="segNav(-1)" style="font-size:11px">${t('prevSeg')}</button>
     <span id="segLabel" style="font-size:11px;color:var(--orange);font-weight:600;min-width:180px;text-align:center;"></span>
-    <button class="zb-btn" onclick="segNav(1)" style="font-size:11px">下一段 ▶</button>
+    <button class="zb-btn" onclick="segNav(1)" style="font-size:11px">${t('nextSeg')}</button>
   </div>`;
 
   // Toggle switches bar
   const tgItems=[
-    {id:'map',label:'地圖',color:'var(--green)'},
-    {id:'speed',label:'速度',color:'var(--red)'},
-    {id:'glat',label:'橫向G',color:'var(--blue)'},
-    {id:'lean',label:'傾角',color:'var(--orange)'},
-    {id:'susp',label:'懸吊',color:'var(--orange)'},
-    {id:'delta',label:'Delta',color:'var(--text2)'}
+    {id:'map',label:t('mapToggle'),color:'var(--green)'},
+    {id:'speed',label:t('speedToggle'),color:'var(--red)'},
+    {id:'glat',label:t('latGToggle'),color:'var(--blue)'},
+    {id:'lean',label:t('leanToggle'),color:'var(--orange)'},
+    {id:'susp',label:t('suspToggle'),color:'var(--orange)'},
+    {id:'delta',label:t('deltaToggle'),color:'var(--text2)'}
   ];
   h+=`<div class="ov-toggles">`;
   tgItems.forEach(t=>{
@@ -785,36 +1044,36 @@ function rOv(){
   // Map + Charts side by side on desktop, stacked on mobile
   h+=`<div class="ov-grid">`;
   // Map
-  h+=`<div class="cd ov-panel${ovToggles.map===false?' hidden':''}" id="ovPanelMap"><h3>賽道軌跡
+  h+=`<div class="cd ov-panel${ovToggles.map===false?' hidden':''}" id="ovPanelMap"><h3>${t('trackLine')}
     <select id="ovMapMode" onchange="updOvMap()" style="background:var(--bg3);color:var(--text);border:1px solid var(--border);padding:2px 5px;border-radius:4px;font-size:10px;">
-      <option value="speed">速度</option><option value="glon">縱向G</option><option value="glat">橫向G</option><option value="brake">煞車/油門</option>
+      <option value="speed">${t('speedOpt')}</option><option value="glon">${t('lonGOpt')}</option><option value="glat">${t('latGOpt')}</option><option value="brake">${t('brakeThrottle')}</option>
     </select></h3>
     <div id="ovMapDiv" class="ov-map"></div>
   </div>`;
   // Stacked charts
   h+=`<div>
-    <div class="cd ov-panel${ovToggles.speed===false?' hidden':''}" id="ovPanelSpeed"><h3>速度</h3><canvas id="cvS" class="sync-canvas" height="200"></canvas></div>
-    <div class="cd ov-panel${ovToggles.susp===false?' hidden':''}" id="ovPanelSusp"><h3>懸吊 (%) <span style="font-size:10px;font-weight:400;margin-left:8px;"><span style="color:#58a6ff">━</span> 前叉 <span style="color:#f0883e;margin-left:6px">━</span> 後避震</span></h3><canvas id="cvU" class="sync-canvas" height="160"></canvas></div>
+    <div class="cd ov-panel${ovToggles.speed===false?' hidden':''}" id="ovPanelSpeed"><h3>${t('speed')}</h3><canvas id="cvS" class="sync-canvas" height="200"></canvas></div>
+    <div class="cd ov-panel${ovToggles.susp===false?' hidden':''}" id="ovPanelSusp"><h3>${t('suspPct')} <span style="font-size:10px;font-weight:400;margin-left:8px;"><span style="color:#58a6ff">━</span> ${t('fork')} <span style="color:#f0883e;margin-left:6px">━</span> ${t('shock')}</span></h3><canvas id="cvU" class="sync-canvas" height="160"></canvas></div>
     <div class="cd ov-panel${ovToggles.glat===false?' hidden':''}" id="ovPanelGlat"><h3>G 值 <span style="font-size:10px;font-weight:400;margin-left:8px;display:inline-flex;gap:3px;vertical-align:middle;">
-      <button class="zb-btn" id="gModeLat" onclick="gChartMode='glat';drawSyncCharts();updGModeUI();" style="font-size:9px;padding:2px 6px;${gChartMode==='glat'?'background:#58a6ff;color:#fff;border-color:#58a6ff':''}">橫向G</button>
-      <button class="zb-btn" id="gModeLon" onclick="gChartMode='glon';drawSyncCharts();updGModeUI();" style="font-size:9px;padding:2px 6px;${gChartMode==='glon'?'background:#3fb950;color:#fff;border-color:#3fb950':''}">縱向G</button>
-      <button class="zb-btn" id="gModeBoth" onclick="gChartMode='both';drawSyncCharts();updGModeUI();" style="font-size:9px;padding:2px 6px;${gChartMode==='both'?'background:var(--orange);color:#fff;border-color:var(--orange)':''}">全部</button>
+      <button class="zb-btn" id="gModeLat" onclick="gChartMode='glat';drawSyncCharts();updGModeUI();" style="font-size:9px;padding:2px 6px;${gChartMode==='glat'?'background:#58a6ff;color:#fff;border-color:#58a6ff':''}">${t('latGBtn')}</button>
+      <button class="zb-btn" id="gModeLon" onclick="gChartMode='glon';drawSyncCharts();updGModeUI();" style="font-size:9px;padding:2px 6px;${gChartMode==='glon'?'background:#3fb950;color:#fff;border-color:#3fb950':''}">${t('lonGBtn')}</button>
+      <button class="zb-btn" id="gModeBoth" onclick="gChartMode='both';drawSyncCharts();updGModeUI();" style="font-size:9px;padding:2px 6px;${gChartMode==='both'?'background:var(--orange);color:#fff;border-color:var(--orange)':''}">${t('allG')}</button>
     </span>
-    <span id="gLegend" style="font-size:10px;font-weight:400;margin-left:10px;display:${gChartMode==='both'?'inline':'none'}"><span style="color:#58a6ff">━</span> 橫向(過彎) <span style="color:#3fb950;margin-left:6px">━</span> 縱向(加減速)</span>
+    <span id="gLegend" style="font-size:10px;font-weight:400;margin-left:10px;display:${gChartMode==='both'?'inline':'none'}"><span style="color:#58a6ff">━</span> ${t('latGCorner')} <span style="color:#3fb950;margin-left:6px">━</span> ${t('lonGAccDec')}</span>
     </h3><canvas id="cvGT" class="sync-canvas" height="160"></canvas></div>
-    <div class="cd ov-panel${ovToggles.lean===false?' hidden':''}" id="ovPanelLean"><h3>傾角（推估）</h3><canvas id="cvLn" class="sync-canvas" height="160"></canvas></div>
+    <div class="cd ov-panel${ovToggles.lean===false?' hidden':''}" id="ovPanelLean"><h3>${t('lean')}</h3><canvas id="cvLn" class="sync-canvas" height="160"></canvas></div>
   </div>`;
   h+=`</div>`;
 
   // Delta
-  h+=`<div class="cd ov-panel${ovToggles.delta===false?' hidden':''}" id="ovPanelDelta"><h3>Delta 時間差（vs 最速圈）</h3><canvas id="cvDelta" class="sync-canvas" height="140"></canvas></div>`;
+  h+=`<div class="cd ov-panel${ovToggles.delta===false?' hidden':''}" id="ovPanelDelta"><h3>${t('deltaTime')}</h3><canvas id="cvDelta" class="sync-canvas" height="140"></canvas></div>`;
 
   // Floating tooltip (follows cursor on charts)
   h+=`<div class="chart-tooltip" id="chartTooltip"></div>`;
 
   // Table
   const rd=riders[0].data;
-  h+=`<div class="cd"><h3>單圈總覽</h3><div class="tscr"><table class="mt"><thead><tr><th>圈</th><th>圈時</th><th>S1</th><th>S2</th><th>S3</th><th>極速</th><th>均速</th><th>尾速</th></tr></thead><tbody>`;
+  h+=`<div class="cd"><h3>${t('lapOverview')}</h3><div class="tscr"><table class="mt"><thead><tr><th>${t('lap')}</th><th>${t('lapTime')}</th><th>S1</th><th>S2</th><th>S3</th><th>${t('topSpd')}</th><th>${t('avgSpd')}</th><th>${t('trapSpeed')}</th></tr></thead><tbody>`;
   rd.laps.forEach((l,i)=>{
     const cls=(l.id===rd.bestId?'best':'')+(i===curLap?' sel':'')+(l.pit?' pit':'');
     const sc=l.secs.map((s,si)=>'<td>'+(s>0?(s===rd.bestSecs[si]?'<span class="sb">':'')+(s/1000).toFixed(1)+(s===rd.bestSecs[si]?'</span>':''):'-')+'</td>').join('');
@@ -920,39 +1179,38 @@ function drawSyncCharts(){
   const lap=gL();if(!lap)return;
   var zm=!!zoomRange;
   // Speed - pass ALL data, let dChart handle zoom via x-axis restriction
-  const ds=[];riders.forEach((r,ri)=>{if(!r.visible)return;const l2=r.data.laps[curLap];if(!l2)return;ds.push({d:l2.pts.map(p=>[getX(p),p[1]]),c:r.color,f:ri===0,fc:r.color+'15'});});
+  const ds=[];riders.forEach((r,ri)=>{if(!r.visible)return;const l2=r.data.laps[curLap];if(!l2)return;ds.push({d:smoothDs(l2.pts.map(p=>[getX(p),p[1]])),c:r.color,f:ri===0,fc:r.color+'15'});});
   dChart('cvS',ds,{h:200,mnY:0,zoom:zm});
   // G value chart (lateral / longitudinal / both)
   if(gChartMode==='glat'){
-    const ds2=[];riders.forEach(r=>{if(!r.visible)return;const l=r.data.laps[curLap];if(!l)return;ds2.push({d:l.pts.map(p=>[getX(p),p[7]]),c:r.color});});
+    const ds2=[];riders.forEach(r=>{if(!r.visible)return;const l=r.data.laps[curLap];if(!l)return;ds2.push({d:smoothDs(l.pts.map(p=>[getX(p),p[7]])),c:r.color});});
     dChart('cvGT',ds2,{h:160,dc:2,zoom:zm});
   } else if(gChartMode==='glon'){
-    const ds2=[];riders.forEach(r=>{if(!r.visible)return;const l=r.data.laps[curLap];if(!l)return;ds2.push({d:l.pts.map(p=>[getX(p),p[6]]),c:r.color});});
+    const ds2=[];riders.forEach(r=>{if(!r.visible)return;const l=r.data.laps[curLap];if(!l)return;ds2.push({d:smoothDs(l.pts.map(p=>[getX(p),p[6]])),c:r.color});});
     dChart('cvGT',ds2,{h:160,dc:2,zoom:zm});
   } else {
-    // both: lateral (blue) + longitudinal (green)
     const dsG=[];
     riders.forEach(r=>{if(!r.visible)return;const l=r.data.laps[curLap];if(!l)return;
-      dsG.push({d:l.pts.map(p=>[getX(p),p[7]]),c:'#58a6ff',w:1.2});
-      dsG.push({d:l.pts.map(p=>[getX(p),p[6]]),c:'#3fb950',w:1.2});
+      dsG.push({d:smoothDs(l.pts.map(p=>[getX(p),p[7]])),c:'#58a6ff',w:1.2});
+      dsG.push({d:smoothDs(l.pts.map(p=>[getX(p),p[6]])),c:'#3fb950',w:1.2});
     });
     dChart('cvGT',dsG,{h:160,dc:2,zoom:zm});
   }
   // Lean angle
   if(document.getElementById('cvLn')){
-    const dsLn=[];riders.forEach(r=>{if(!r.visible)return;const l2=r.data.laps[curLap];if(!l2)return;dsLn.push({d:l2.pts.map(p=>[getX(p),Math.atan(Math.abs(p[7]))*180/Math.PI*(p[7]<0?-1:1)]),c:r.color});});
+    const dsLn=[];riders.forEach(r=>{if(!r.visible)return;const l2=r.data.laps[curLap];if(!l2)return;dsLn.push({d:smoothDs(l2.pts.map(p=>[getX(p),Math.atan(Math.abs(p[7]))*180/Math.PI*(p[7]<0?-1:1)])),c:r.color});});
     dChart('cvLn',dsLn,{h:160,dc:1,zoom:zm});
   }
   // Susp
-  dChart('cvU',[{d:lap.pts.map(p=>[getX(p),p[2]]),c:'#58a6ff'},{d:lap.pts.map(p=>[getX(p),p[3]]),c:'#f0883e'}],{h:160,zoom:zm});
+  dChart('cvU',[{d:smoothDs(lap.pts.map(p=>[getX(p),p[2]])),c:'#58a6ff'},{d:smoothDs(lap.pts.map(p=>[getX(p),p[3]])),c:'#f0883e'}],{h:160,zoom:zm});
   // Delta
   const rd=riders[0].data,bestLap=rd.laps.find(l=>l.id===rd.bestId);
   if(bestLap&&bestLap.id!==lap.id){
     const dd=[];const n=Math.min(bestLap.pts.length,lap.pts.length);
     for(var i=0;i<n;i++)dd.push([getX(lap.pts[i]),(lap.pts[i][0]-bestLap.pts[i][0])/1000]);
-    dChart('cvDelta',[{d:dd,c:'var(--red)',w:2}],{h:140,dc:2,zoom:zm});
+    dChart('cvDelta',[{d:smoothDs(dd),c:'#f85149',w:2}],{h:140,dc:2,zoom:zm});
   }else{
-    const r=sC2('cvDelta',140);if(r){r.x.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--bg');r.x.fillRect(0,0,r.W,r.H);r.x.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--text3');r.x.font='11px sans-serif';r.x.textAlign='center';r.x.fillText('已選最速圈',r.W/2,r.H/2);}
+    const r=sC2('cvDelta',140);if(r){r.x.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--bg');r.x.fillRect(0,0,r.W,r.H);r.x.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--text3');r.x.font='11px sans-serif';r.x.textAlign='center';r.x.fillText(t('bestLapSelected'),r.W/2,r.H/2);}
   }
 }
 
@@ -1115,9 +1373,9 @@ function updateSyncCursor(ratio){
   const pt=lap.pts[idx];if(!pt)return;
   
   // 1. Update cursor info bar
-  const t=pt[0]/1000;
+  const tVal=pt[0]/1000;
   const el=id=>document.getElementById(id);
-  if(el('ciTime'))el('ciTime').textContent=t.toFixed(1)+'s';
+  if(el('ciTime'))el('ciTime').textContent=tVal.toFixed(1)+'s';
   if(el('ciSpd'))el('ciSpd').textContent=pt[1].toFixed(1);
   if(el('ciGLat'))el('ciGLat').textContent=pt[7].toFixed(2);
   if(el('ciGLon'))el('ciGLon').textContent=(pt[6]>0?'+':'')+pt[6].toFixed(2);
@@ -1131,13 +1389,13 @@ function updateSyncCursor(ratio){
   if(tt){
     var lean2=Math.atan(Math.abs(pt[7]))*180/Math.PI;
     var leanStr=(pt[7]<0?'-':'')+lean2.toFixed(1)+'°';
-    tt.innerHTML='<div class="tt-time">'+t.toFixed(1)+'s / '+pt[8].toFixed(0)+'m</div>'
-      +'<div class="tt-row"><span class="tt-label">車速:</span><span class="tt-val" style="color:#f85149">'+pt[1].toFixed(1)+' km/h</span></div>'
-      +'<div class="tt-row"><span class="tt-label" style="color:#58a6ff">前叉:</span><span class="tt-val" style="color:#58a6ff">'+pt[2]+' %</span></div>'
-      +'<div class="tt-row"><span class="tt-label" style="color:#f0883e">後避震:</span><span class="tt-val" style="color:#f0883e">'+pt[3]+' %</span></div>'
-      +'<div class="tt-row"><span class="tt-label">橫向G:</span><span class="tt-val" style="color:#58a6ff">'+pt[7].toFixed(2)+'</span></div>'
-      +'<div class="tt-row"><span class="tt-label">縱向G:</span><span class="tt-val" style="color:#3fb950">'+(pt[6]>0?'+':'')+pt[6].toFixed(2)+'</span></div>'
-      +'<div class="tt-row"><span class="tt-label">傾角:</span><span class="tt-val" style="color:#f0883e">'+leanStr+'</span></div>';
+    tt.innerHTML='<div class="tt-time">'+tVal.toFixed(1)+'s / '+pt[8].toFixed(0)+'m</div>'
+      +'<div class="tt-row"><span class="tt-label">'+LANG[curLang].ttSpeed+'</span><span class="tt-val" style="color:#f85149">'+pt[1].toFixed(1)+' km/h</span></div>'
+      +'<div class="tt-row"><span class="tt-label" style="color:#58a6ff">'+LANG[curLang].ttFork+'</span><span class="tt-val" style="color:#58a6ff">'+pt[2]+' %</span></div>'
+      +'<div class="tt-row"><span class="tt-label" style="color:#f0883e">'+LANG[curLang].ttShock+'</span><span class="tt-val" style="color:#f0883e">'+pt[3]+' %</span></div>'
+      +'<div class="tt-row"><span class="tt-label">'+LANG[curLang].ttLatG+'</span><span class="tt-val" style="color:#58a6ff">'+pt[7].toFixed(2)+'</span></div>'
+      +'<div class="tt-row"><span class="tt-label">'+LANG[curLang].ttLonG+'</span><span class="tt-val" style="color:#3fb950">'+(pt[6]>0?'+':'')+pt[6].toFixed(2)+'</span></div>'
+      +'<div class="tt-row"><span class="tt-label">'+LANG[curLang].ttLean+'</span><span class="tt-val" style="color:#f0883e">'+leanStr+'</span></div>';
     // Position tooltip near cursor
     var tx=cursorMouseX+15,ty=cursorMouseY-10;
     var vw=window.innerWidth,vh=window.innerHeight;
@@ -1589,6 +1847,95 @@ function rCrn(){
       });
     }
   },150);
+}
+
+// ===== DAMPING ANALYSIS (阻尼分析) =====
+function rDamp(){
+  const l=gL();if(!l)return;
+  const issues=analyzeDamping(l);
+  const score=calcDampingScore(issues);
+  const forkIssues=issues.filter(x=>x.zone==='fork').length;
+  const shockIssues=issues.filter(x=>x.zone==='shock').length;
+  const forkScore=Math.max(20,100-forkIssues*12);
+  const shockScore=Math.max(20,100-shockIssues*12);
+  const scoreCol=score>80?'#3fb950':score>50?'#f0883e':'#f85149';
+
+  // === 1. Score cards ===
+  let h=`<div class="sg">
+    <div class="sc"><div class="v" style="color:${scoreCol};font-size:28px;font-weight:600;">${score}</div><div class="l">${t('dampHealth')}</div></div>
+    <div class="sc"><div class="v" style="color:${forkScore>80?'#3fb950':forkScore>50?'#f0883e':'#f85149'}">${forkScore}</div><div class="l">${t('frontFork')}</div></div>
+    <div class="sc"><div class="v" style="color:${shockScore>80?'#3fb950':shockScore>50?'#f0883e':'#f85149'}">${shockScore}</div><div class="l">${t('rearShock')}</div></div>
+    <div class="sc"><div class="v">${issues.length}</div><div class="l">${t('issuesFound')}</div></div>
+  </div>`;
+
+  // === 2. Charts FIRST (user sees the data, then reads analysis below) ===
+  h+=`<div style="padding:0 4px;">
+    <div style="display:flex;align-items:center;gap:12px;margin:12px 0 6px;">
+      <span style="font-size:12px;font-weight:600;color:var(--orange);">${curLang==='zh'?'懸吊行程':'Suspension Travel'}</span>
+      <span style="font-size:10px;color:#58a6ff;">● ${curLang==='zh'?'前叉':'Fork'}</span>
+      <span style="font-size:10px;color:#f0883e;">● ${curLang==='zh'?'後避震':'Shock'}</span>
+    </div>
+    <canvas id="dampSuspChart" style="width:100%;"></canvas>
+    <div style="font-size:12px;font-weight:600;margin:12px 0 6px;color:var(--orange);">${curLang==='zh'?'縱向 G 力':'Longitudinal G'}</div>
+    <canvas id="dampGChart" style="width:100%;"></canvas>
+  </div>`;
+
+  // === 3. Issue grid — compact cards matching score card style ===
+  if(issues.length===0){
+    h+=`<div style="text-align:center;padding:20px;color:var(--text2);font-size:13px;">${t('noIssues')}</div>`;
+  } else {
+    h+=`<div class="sg" style="margin-top:4px;">`;
+    issues.forEach(iss=>{
+      const sevCol=iss.severity==='severe'?'#f85149':iss.severity==='moderate'?'#f0883e':'#ffc107';
+      const compName=iss.zone==='fork'?(curLang==='zh'?'前叉':'Fork'):(curLang==='zh'?'後避震':'Shock');
+      const sug=curLang==='zh'?iss.suggestion_zh:iss.suggestion_en;
+      const t0=(iss.startTime/1000).toFixed(1),t1=(iss.endTime/1000).toFixed(1);
+      h+=`<div class="sc" style="cursor:pointer;border-left:2px solid ${sevCol};" onclick="zoomRange={start:${iss.startTime/l.dur},end:${iss.endTime/l.dur}};render();">
+        <div class="v" style="color:${sevCol};font-size:13px;font-weight:700;">${t0}~${t1}s</div>
+        <div class="l" style="font-size:10px;line-height:1.3;white-space:normal;">${compName}：${sug}</div>
+      </div>`;
+    });
+    h+=`</div>`;
+  }
+
+  document.getElementById('acnt').innerHTML=h;
+
+  // === 4. Draw charts ===
+  setTimeout(()=>{
+    const forkData=[],shockData=[];
+    l.pts.forEach(p=>{forkData.push([p[0]/1000,p[2]]);shockData.push([p[0]/1000,p[3]]);});
+    dChart('dampSuspChart',[{d:forkData,c:'#58a6ff',w:1.5},{d:shockData,c:'#f0883e',w:1.5}],{h:160});
+
+    // Highlight issue zones on susp chart (context already has DPR scale from dChart/sC2)
+    const cv=document.getElementById('dampSuspChart');
+    if(cv&&issues.length>0){
+      const ctx=cv.getContext('2d');
+      const W=cv.clientWidth,H=160;
+      const P={l:42,r:10,t:10,b:22};
+      const gW=W-P.l-P.r,gH=H-P.t-P.b;
+      // X range must match what dChart computed from the data
+      const mnX=forkData[0][0],mxX=forkData[forkData.length-1][0];
+      issues.forEach(iss=>{
+        const issT0=iss.startTime/1000,issT1=iss.endTime/1000;
+        const x0=P.l+((issT0-mnX)/(mxX-mnX))*gW;
+        const x1=P.l+((issT1-mnX)/(mxX-mnX))*gW;
+        if(x1>P.l&&x0<P.l+gW){
+          const col=iss.severity==='severe'?'rgba(248,81,73,0.2)':iss.severity==='moderate'?'rgba(240,136,62,0.2)':'rgba(255,193,7,0.2)';
+          ctx.fillStyle=col;
+          ctx.fillRect(Math.max(P.l,x0),P.t,Math.min(x1,P.l+gW)-Math.max(P.l,x0),gH);
+          // Time label at top of zone
+          const cx=(Math.max(P.l,x0)+Math.min(x1,P.l+gW))/2;
+          ctx.fillStyle=iss.severity==='severe'?'#f85149':'#f0883e';
+          ctx.font='bold 9px sans-serif';ctx.textAlign='center';
+          ctx.fillText(issT0.toFixed(1)+'s',cx,P.t+10);
+        }
+      });
+    }
+
+    const gLonData=[];
+    l.pts.forEach(p=>{gLonData.push([p[0]/1000,p[6]]);});
+    dChart('dampGChart',[{d:gLonData,c:'#3fb950',w:1.5,f:true,fc:'rgba(63,185,80,0.08)'}],{h:120,mnY:-2,mxY:2,dc:1});
+  },50);
 }
 
 // ===== SUGGESTIONS (最佳化建議) =====
