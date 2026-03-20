@@ -1,0 +1,14 @@
+{
+  "name": "賽道遙測分析 Pro",
+  "short_name": "賽道分析",
+  "description": "大鵬灣國際賽車場 — 專業遙測數據分析平台",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0e14",
+  "theme_color": "#f85149",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"}
+  ]
+}
