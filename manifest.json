@@ -1,7 +1,7 @@
 {
-  "name": "賽道遙測分析 Pro",
-  "short_name": "賽道分析",
-  "description": "大鵬灣國際賽車場 — 專業遙測數據分析平台",
+  "name": "RES Instrument — Racing Telemetry Analysis",
+  "short_name": "RES Instrument",
+  "description": "Racing Electronic System — Visualize your sensation",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "any",

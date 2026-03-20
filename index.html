@@ -10,11 +10,11 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<title>賽道遙測分析 Ultimate</title>
-<meta property="og:title" content="賽道遙測分析 Pro — 摩托車遙測數據分析">
-<meta property="og:description" content="專業級賽道遙測分析工具：GPS軌跡、G值、煞車點、分段計時、傾角推估、AI建議">
+<title>RES Instrument — Racing Telemetry Analysis</title>
+<meta property="og:title" content="RES Instrument — Racing Telemetry Analysis">
+<meta property="og:description" content="Racing Electronic System — GPS軌跡、G值、懸吊、煞車點、分段計時、傾角推估、AI建議">
 <meta property="og:type" content="website">
-<meta property="og:image" content="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='630' style='background:%230a0e14'><text x='50%25' y='40%25' text-anchor='middle' fill='%23f85149' font-size='64' font-family='sans-serif' font-weight='bold'>賽道遙測分析 Pro</text><text x='50%25' y='58%25' text-anchor='middle' fill='%23e6edf3' font-size='28' font-family='sans-serif'>GPS • G-Force • 傾角 • 分段計時</text><text x='50%25' y='72%25' text-anchor='middle' fill='%238b949e' font-size='22' font-family='sans-serif'>摩托車賽道數據分析工具</text></svg>">
+<meta property="og:image" content="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='630' style='background:%230a0e14'><text x='50%25' y='40%25' text-anchor='middle' fill='%23f85149' font-size='64' font-family='sans-serif' font-weight='bold'>RES Instrument</text><text x='50%25' y='58%25' text-anchor='middle' fill='%23e6edf3' font-size='28' font-family='sans-serif'>Racing Electronic System</text><text x='50%25' y='72%25' text-anchor='middle' fill='%238b949e' font-size='22' font-family='sans-serif'>Visualize your sensation</text></svg>">
 <style>
 
 :root{--bg:#0a0e14;--bg2:#161b22;--bg3:#21262d;--border:#30363d;--text:#e6edf3;--text2:#8b949e;--text3:#6e7681;--red:#f85149;--green:#3fb950;--blue:#58a6ff;--orange:#f0883e;--purple:#bc8cff;}
@@ -220,7 +220,7 @@ canvas{width:100%;border-radius:5px;background:var(--bg);touch-action:pan-y;}
 <div id="loadScreen"><h1>賽道分析</h1><div style="color:var(--text3);font-size:11px;">Ultimate Edition</div><div class="spin"></div><div id="loadMsg">載入中...</div></div>
 
 <div id="homeScreen" class="hide">
-  <div class="home-hdr"><h1>賽道遙測分析</h1><p>Dapeng Bay Track Analyzer</p><div class="ver">Ultimate v3.0</div></div>
+  <div class="home-hdr"><h1>RES Instrument</h1><p>Racing Electronic System — Visualize your sensation</p><div class="ver">v3.0</div></div>
   <div class="gd-box"><label>📁 從 Google Drive 匯入</label><input type="text" id="gdUrl" placeholder="貼上分享連結..."><div class="hint">資料夾或檔案需設為「知道連結的人都能查看」</div><button id="gdBtn">載入</button></div>
   <div class="or-div">— 或 —</div>
   <div class="up-box" id="upBox"><div class="ico">📂</div><p>從手機/電腦選擇 CSV 檔案</p><input type="file" id="upFiles" multiple accept=".csv,.CSV"></div>
@@ -1783,7 +1783,7 @@ function exportPDF(){
   .footer{text-align:center;color:#656d76;font-size:10px;margin-top:30px;border-top:1px solid #d0d7de;padding-top:10px;}
   @media print{body{padding:10px;}}
 </style></head><body>
-<h1>🏁 賽道遙測分析報告</h1>
+<h1>🏁 RES Instrument — Telemetry Report</h1>
 <p><b>賽道：</b>${rd.trackName||'未知'} | <b>日期：</b>${new Date().toLocaleDateString('zh-TW')} | <b>圈數：</b>L${lap.id}</p>
 <div class="stats">
   <div class="stat"><div class="v" style="color:#cf222e">${ms2l(lap.dur)}</div><div class="l">圈時</div></div>
@@ -1815,7 +1815,7 @@ function exportPDF(){
     content+=`</table>`;
   }
 
-  content+=`<div class="footer">由 賽道遙測分析 Pro 產生 — ${new Date().toLocaleString('zh-TW')}</div></body></html>`;
+  content+=`<div class="footer">由 RES Instrument 產生 — ${new Date().toLocaleString('zh-TW')}</div></body></html>`;
 
   const blob=new Blob([content],{type:'text/html'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
