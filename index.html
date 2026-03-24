@@ -10,6 +10,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
 <title>RES Instrument — Racing Telemetry Analysis</title>
 <meta property="og:title" content="RES Instrument — Racing Telemetry Analysis">
 <meta property="og:description" content="Racing Electronic System — GPS軌跡、G值、懸吊、煞車點、分段計時、傾角推估、AI建議">
@@ -678,6 +679,23 @@ function dChart(cid,ds,o={}){
 function parseT(t){const p=t.split(':');return+p[0]*3600000+ +p[1]*60000+ +p[2]*1000+ +p[3];}
 function parseC(s){s=s.trim();if(s[0]==='N'||s[0]==='E')s=s.slice(1);const p=s.split('_');return+p[0]+ +p[1]/60;}
 
+// Extract actual recording date from CSV content (col 1) or filename
+function parseDataDate(text,filename){
+  if(text){const ls=text.trim().split('\n');
+    if(ls.length>1){const cols=ls[1].split(',');
+      if(cols.length>1){const raw=cols[1].trim();let m;
+        if((m=raw.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/))){const d=new Date(+m[1],+m[2]-1,+m[3]);if(!isNaN(d.getTime())&&+m[1]>2000)return d;}
+        if((m=raw.match(/^(\d{8})$/))){const d=new Date(+raw.slice(0,4),+raw.slice(4,6)-1,+raw.slice(6,8));if(!isNaN(d.getTime())&&+raw.slice(0,4)>2000&&+raw.slice(4,6)<=12&&+raw.slice(6,8)<=31)return d;}
+      }
+    }
+  }
+  if(filename){let m;
+    if((m=filename.match(/(\d{4})[_\-\.](\d{2})[_\-\.](\d{2})/))){const d=new Date(+m[1],+m[2]-1,+m[3]);if(!isNaN(d.getTime())&&+m[1]>2000)return d;}
+    if((m=filename.match(/(\d{4})(\d{2})(\d{2})/))){const yr=+m[1],mo=+m[2],dy=+m[3];if(yr>2000&&mo>=1&&mo<=12&&dy>=1&&dy<=31){const d=new Date(yr,mo-1,dy);if(!isNaN(d.getTime()))return d;}}
+  }
+  return null;
+}
+
 // Savitzky-Golay smoothing filter (quadratic, window=2*hw+1)
 // Smooth [x,y] pair array — smooths Y values, keeps X intact
 function smoothDs(data){try{if(!data||data.length<7)return data;const yS=sgSmooth(data.map(p=>p[1]),3);return data.map((p,i)=>[p[0],yS[i]]);}catch(e){return data;}}
@@ -742,7 +760,14 @@ function procCSV(texts){
     const glonF=butterworth(glonR),glatF=butterworth(glatR);
     pts.forEach((p,i)=>{p.gLon=glonF[i];p.gLat=p.s<25?0:glatF[i];});
     const ref={la:pts[0].la,lo:pts[0].lo};const cx=[];
-    for(let i=1;i<pts.length;i++){if(pts[i].s<15)continue;const d=Math.sqrt((pts[i].la-ref.la)**2+(pts[i].lo-ref.lo)**2);if(d<0.0003&&(!cx.length||(pts[i].t-pts[cx[cx.length-1]].t)>30000))cx.push(i);}
+    // Improved: track minimum-distance approach within each zone entry (more robust than first-entry)
+    // Zone radius 0.0006° ≈ 67m — wide enough for GPS drift at high speed
+    let inZone=false,minD=Infinity,minI=-1;
+    for(let i=1;i<pts.length;i++){if(pts[i].s<15)continue;const d=Math.sqrt((pts[i].la-ref.la)**2+(pts[i].lo-ref.lo)**2);
+      if(d<0.0006){if(!inZone){inZone=true;minD=d;minI=i;}else if(d<minD){minD=d;minI=i;}}
+      else if(inZone){inZone=false;if(minI>=0&&(!cx.length||(pts[minI].t-pts[cx[cx.length-1]].t)>30000))cx.push(minI);minD=Infinity;minI=-1;}
+    }
+    if(inZone&&minI>=0&&(!cx.length||(pts[minI].t-pts[cx[cx.length-1]].t)>30000))cx.push(minI);
     for(let i=0;i<cx.length-1;i++){
       lapNum++;
       const lp=pts.slice(cx[i],cx[i+1]+1),dur=lp[lp.length-1].t-lp[0].t,spds=lp.map(p=>p.s),mov=spds.filter(s=>s>0),d0=lp[0].d,dist=lp[lp.length-1].d-d0;
@@ -771,26 +796,64 @@ function procCSV(texts){
 // ===== Google Drive =====
 async function loadGD(url){
   show('load');msg('連接 Google Drive...');
-  const fm=url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-  if(fm){
-    try{msg('下載檔案...');const r=await fetch('https://drive.google.com/uc?export=download&id='+fm[1]);
-    if(r.ok){const t=await r.text();if(t.includes('time,')||t.includes('speed')){const d=procCSV([t]);if(d){addRider(d,'GDrive_'+new Date().toLocaleDateString('zh-TW'));return;}}}}catch(e){}
+  // Folder links cannot be downloaded directly
+  if(url.includes('/drive/folders/')){
+    show('home');toast('資料夾連結無法直接下載，請改為分享個別 CSV 或 ZIP 檔案連結');return;
   }
+  const fm=url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if(!fm){show('home');toast('無效的 Google Drive 連結');return;}
+  const fid=fm[1];
+  try{
+    msg('下載檔案...');
+    let r=await fetch('https://drive.google.com/uc?export=download&id='+fid);
+    if(!r.ok){show('home');toast('下載失敗（HTTP '+r.status+'），請確認連結設為公開');return;}
+    const buf=await r.arrayBuffer();
+    const bytes=new Uint8Array(buf);
+    // ZIP magic bytes: PK\x03\x04
+    if(bytes[0]===0x50&&bytes[1]===0x4B){
+      if(typeof JSZip==='undefined'){show('home');toast('ZIP 解壓功能未載入，請確認網路連線並重新整理');return;}
+      msg('解壓縮 ZIP...');
+      const zip=await JSZip.loadAsync(buf);
+      const csvEntries=[];
+      zip.forEach((path,f)=>{if(!f.dir&&path.toLowerCase().endsWith('.csv'))csvEntries.push({path,f});});
+      if(!csvEntries.length){show('home');toast('ZIP 中找不到 CSV 檔案');return;}
+      msg('讀取 CSV...');
+      const texts=await Promise.all(csvEntries.map(e=>e.f.async('text')));
+      const d=procCSV(texts);
+      if(d){const dt=parseDataDate(texts[0],csvEntries[0].path)||new Date();addRider(d,'GDrive_'+dt.toLocaleDateString('zh-TW'),dt.toISOString());return;}
+      show('home');toast('CSV 解析失敗，請確認資料格式');return;
+    }
+    let text=new TextDecoder('utf-8').decode(buf);
+    // Google large-file virus warning page (HTML response) — extract confirm token
+    if(text.trimStart().startsWith('<')){
+      const cm=text.match(/confirm=([0-9A-Za-z_-]+)/);
+      if(cm){
+        msg('確認大型檔案下載...');
+        r=await fetch('https://drive.google.com/uc?export=download&confirm='+cm[1]+'&id='+fid);
+        if(r.ok)text=await r.text();
+      }
+    }
+    if(text.includes('time,')||text.includes('speed')){
+      const d=procCSV([text]);
+      if(d){const dt=parseDataDate(text,'')||new Date();addRider(d,'GDrive_'+dt.toLocaleDateString('zh-TW'),dt.toISOString());return;}
+    }
+  }catch(e){console.error('GDrive:',e);}
   show('home');toast('請確認連結設為公開，或直接選擇檔案匯入');
 }
 
 function handleFiles(fl){
   show('load');msg('讀取檔案...');
   Promise.all(Array.from(fl).map(f=>new Promise((r,j)=>{const rd=new FileReader();rd.onload=e=>r(e.target.result);rd.onerror=j;rd.readAsText(f);}))).then(ts=>{
-    msg('分析數據...');setTimeout(()=>{const d=procCSV(ts);if(!d){show('home');toast('無法偵測有效圈數');return;}addRider(d,fl[0].name.replace(/\.[^.]+$/,'').replace(/STA\d+/,'場次')+'_'+new Date().toLocaleDateString('zh-TW'));},100);
+    msg('分析數據...');setTimeout(()=>{const d=procCSV(ts);if(!d){show('home');toast('無法偵測有效圈數');return;}const dt=parseDataDate(ts[0],fl[0].name)||new Date();const baseName=fl[0].name.replace(/\.[^.]+$/,'').replace(/STA\d+/,'場次');addRider(d,baseName+'_'+dt.toLocaleDateString('zh-TW'),dt.toISOString());},100);
   });
 }
 
-function addRider(data,name){
+function addRider(data,name,dateISO){
   try{
-  data.rider=name;riders.push({name,color:COL[riders.length%COL.length],data,visible:true});
+  data.rider=name;data.sessionDate=dateISO||new Date().toISOString();
+  riders.push({name,color:COL[riders.length%COL.length],data,visible:true});
   const bestLap=data.laps.find(l=>l.id===data.bestId);
-  sessions.unshift({name,date:new Date().toISOString(),laps:data.laps.length,best:bestLap?ms2l(bestLap.dur):'--',spd:Math.max(...data.laps.map(l=>l.maxS))});
+  sessions.unshift({name,date:data.sessionDate,laps:data.laps.length,best:bestLap?ms2l(bestLap.dur):'--',spd:Math.max(...data.laps.map(l=>l.maxS))});
   if(sessions.length>20)sessions.length=20;
   try{localStorage.setItem('tSessions',JSON.stringify(sessions));}catch(e){}
   showApp();
@@ -2147,7 +2210,7 @@ function saveSessionHist(){
   const valid=rd.laps.filter((l,i)=>!l.pit&&!excludedLaps.has(i));if(!valid.length)return;
   const best=valid.reduce((b,l)=>l.dur<b.dur?l:b,valid[0]);
   const entry={
-    date:new Date().toLocaleString('zh-TW'),
+    date:new Date(riders[0].data.sessionDate||Date.now()).toLocaleString('zh-TW'),
     track:riders[0].data.trackName||'未知賽道',
     laps:valid.length,
     best:ms2l(best.dur),
@@ -2170,6 +2233,7 @@ function exportPDF(){
   const cData=getCornerData();
   const valid=rd.laps.filter((l,i)=>!l.pit&&!excludedLaps.has(i));
   const mean=valid.reduce((a,x)=>a+x.dur,0)/valid.length;
+  const bestLap=rd.laps.find(l=>l.id===rd.bestId);
 
   let content=`
 <!DOCTYPE html><html><head><meta charset="UTF-8"><title>圈速報告 L${lap.id}</title>
@@ -2188,7 +2252,7 @@ function exportPDF(){
   @media print{body{padding:10px;}}
 </style></head><body>
 <h1>🏁 RES Instrument — Telemetry Report</h1>
-<p><b>賽道：</b>${rd.trackName||'未知'} | <b>日期：</b>${new Date().toLocaleDateString('zh-TW')} | <b>圈數：</b>L${lap.id}</p>
+<p><b>賽道：</b>${rd.trackName||'未知'} | <b>日期：</b>${new Date(rd.sessionDate||Date.now()).toLocaleDateString('zh-TW')} | <b>圈數：</b>L${lap.id}</p>
 <div class="stats">
   <div class="stat"><div class="v" style="color:#cf222e">${ms2l(lap.dur)}</div><div class="l">圈時</div></div>
   <div class="stat"><div class="v">${lap.maxS}</div><div class="l">極速 km/h</div></div>
@@ -2217,6 +2281,79 @@ function exportPDF(){
       content+=`<tr><td>${c.name}</td><td>${c.avgMin} km/h</td><td>${c.bestMin}</td><td>${c.worstMin}</td><td>${c.range} km/h</td></tr>`;
     });
     content+=`</table>`;
+  }
+
+  // ===== AI Suggestions Section =====
+  {
+    let suggestions=[];
+    if(valid.length>1){
+      for(let s=0;s<3;s++){
+        const times=valid.map(l=>l.secs[s]).filter(t=>t>0);
+        if(times.length<2)continue;
+        const best=Math.min(...times),worst=Math.max(...times),gap=(worst-best)/1000;
+        if(gap>0.5) suggestions.push({pri:gap>1.5?'high':gap>0.8?'med':'low',title:`Sector ${s+1} 穩定性不足`,body:`最快 ${(best/1000).toFixed(1)}s vs 最慢 ${(worst/1000).toFixed(1)}s，差距 ${gap.toFixed(2)}s`});
+      }
+    }
+    cData.forEach(c=>{
+      if(c.range>5) suggestions.push({pri:c.range>15?'high':c.range>8?'med':'low',title:`${c.name} 入彎速度不一致`,body:`最低速差距 ${c.range} km/h（${c.bestMin}～${c.worstMin} km/h）`});
+    });
+    if(bestLap){
+      const theoGap=(bestLap.dur-rd.theoBest)/1000;
+      if(theoGap>0.3) suggestions.push({pri:theoGap>1?'high':theoGap>0.5?'med':'low',title:`理論最速圈差距 ${theoGap.toFixed(3)}s`,body:`最速圈 ${ms2l(bestLap.dur)} vs 理論 ${ms2l(rd.theoBest)}，還有 ${theoGap.toFixed(3)}s 可以進步`});
+    }
+    if(valid.length>1){
+      const maxSpds=valid.map(l=>l.maxS),topSpd=Math.max(...maxSpds),avgMaxSpd=maxSpds.reduce((a,b)=>a+b)/maxSpds.length,spdGap=topSpd-avgMaxSpd;
+      if(spdGap>5) suggestions.push({pri:spdGap>15?'high':'med',title:`尾速/極速未充分利用`,body:`最高 ${topSpd} km/h vs 平均極速 ${avgMaxSpd.toFixed(1)} km/h，差距 ${spdGap.toFixed(1)} km/h`});
+    }
+    if(valid.length>=4){
+      const first3=valid.slice(0,3).reduce((a,l)=>a+l.dur,0)/3,last3=valid.slice(-3).reduce((a,l)=>a+l.dur,0)/3,degrade=(last3-first3)/1000;
+      if(degrade>1) suggestions.push({pri:degrade>3?'high':degrade>1.5?'med':'low',title:`後段圈速衰退 ${degrade.toFixed(1)}s`,body:`前 3 圈平均 ${ms2l(first3)} → 後 3 圈平均 ${ms2l(last3)}`});
+    }
+    const priOrder={high:0,med:1,low:2};
+    suggestions.sort((a,b)=>priOrder[a.pri]-priOrder[b.pri]);
+    content+=`<h2>AI 最佳化建議（${suggestions.length} 項）</h2>`;
+    if(suggestions.length===0){
+      content+=`<p style="color:#3fb950;">表現優秀！暫無明顯改善建議。</p>`;
+    } else {
+      content+=`<table><tr><th style="width:50px">優先</th><th>項目</th><th>說明</th></tr>`;
+      suggestions.forEach(s=>{
+        const priLabel=s.pri==='high'?'🔴 重要':s.pri==='med'?'🟡 中等':'🟢 輕微';
+        const bgCol=s.pri==='high'?'#fff5f5':s.pri==='med'?'#fff8e1':'';
+        content+=`<tr style="background:${bgCol}"><td style="font-size:10px;text-align:center;">${priLabel}</td><td style="font-weight:600;">${s.title}</td><td>${s.body}</td></tr>`;
+      });
+      content+=`</table>`;
+    }
+  }
+
+  // ===== Damping Analysis Section =====
+  {
+    const issues=analyzeDamping(lap);
+    const score=calcDampingScore(issues);
+    const forkIssues=issues.filter(x=>x.zone==='fork').length;
+    const shockIssues=issues.filter(x=>x.zone==='shock').length;
+    const forkScore=Math.max(20,100-forkIssues*12);
+    const shockScore=Math.max(20,100-shockIssues*12);
+    const scoreCol=score>80?'#3fb950':score>50?'#f0883e':'#f85149';
+    content+=`<h2>阻尼分析</h2>`;
+    content+=`<div class="stats">
+      <div class="stat"><div class="v" style="color:${scoreCol}">${score}</div><div class="l">懸吊健康度</div></div>
+      <div class="stat"><div class="v" style="color:${forkScore>80?'#3fb950':forkScore>50?'#f0883e':'#f85149'}">${forkScore}</div><div class="l">前叉</div></div>
+      <div class="stat"><div class="v" style="color:${shockScore>80?'#3fb950':shockScore>50?'#f0883e':'#f85149'}">${shockScore}</div><div class="l">後避震</div></div>
+      <div class="stat"><div class="v">${issues.length}</div><div class="l">問題數</div></div>
+    </div>`;
+    if(issues.length===0){
+      content+=`<p style="color:#3fb950;">懸吊表現良好，未偵測到明顯阻尼問題。</p>`;
+    } else {
+      content+=`<table><tr><th>時間</th><th>部位</th><th>嚴重度</th><th>類型</th><th>建議</th></tr>`;
+      issues.forEach(iss=>{
+        const sevLabel=iss.severity==='severe'?'🔴 嚴重':iss.severity==='moderate'?'🟡 中等':'🟢 輕微';
+        const compName=iss.zone==='fork'?'前叉':'後避震';
+        const typeMap={oscillation:'震盪',gRatioAnomaly:'G值比異常',brakingOvershoot:'煞車過衝',accelOscillation:'加速震盪'};
+        const bgCol=iss.severity==='severe'?'#fff5f5':iss.severity==='moderate'?'#fff8e1':'';
+        content+=`<tr style="background:${bgCol}"><td>${(iss.startTime/1000).toFixed(1)}~${(iss.endTime/1000).toFixed(1)}s</td><td>${compName}</td><td style="font-size:10px;">${sevLabel}</td><td>${typeMap[iss.type]||iss.type}</td><td>${iss.suggestion_zh}</td></tr>`;
+      });
+      content+=`</table>`;
+    }
   }
 
   content+=`<div class="footer">由 RES Instrument 產生 — ${new Date().toLocaleString('zh-TW')}</div></body></html>`;
